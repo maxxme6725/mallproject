@@ -1,0 +1,312 @@
+/** 
+ * 
+ */
+package fr.utbm.info.ia54.mallproject.model
+
+import io.sarl.core.AgentKilled
+import io.sarl.core.AgentSpawned
+import io.sarl.core.ContextJoined
+import io.sarl.core.ContextLeft
+import io.sarl.core.Destroy
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import io.sarl.core.MemberJoined
+import io.sarl.core.MemberLeft
+import io.sarl.core.ParticipantJoined
+import io.sarl.core.ParticipantLeft
+import io.sarl.core.SpaceCreated
+import io.sarl.core.SpaceDestroyed
+import io.sarl.core.Lifecycle
+import io.sarl.core.DefaultContextInteractions
+import javafx.scene.paint.Color
+import javafx.scene.shape.Circle
+import java.util.List
+import java.util.LinkedList
+import java.util.concurrent.ThreadLocalRandom
+
+import fr.utbm.info.ia54.mallproject.model.CustomerInitializedEvent;
+import javafx.geometry.Point2D
+
+/** 
+ * @author ma-pe
+ * 
+ */
+agent CustomerAgent {
+	uses Lifecycle, DefaultContextInteractions, Logging
+
+	on Initialize {
+		// Event trigger before the agent begin to live or to be used.
+		// You should put all the initialization statements in this block of code.
+		
+		var circle : Circle = new Circle();
+		
+		
+		//Randomize which entrance this agent spawns in
+		if(Math.random()<0.5) //top entrance
+		{
+			circle.setCenterX(400)
+			circle.setCenterY(25)
+		}
+		else //bottom entrance
+		{
+			circle.setCenterX(750)
+			circle.setCenterY(725)
+		}
+
+		//Randomize agent color
+		circle.setFill = Color.color(Math.random(), Math.random(), Math.random());
+		
+		//For now, the radius is chosen. If we want to make children agents later, we can do some randomization here as well
+		circle.setRadius(5);
+
+		
+		//Randomize list of objectives
+		var objectives : List<Point2D> = new LinkedList<Point2D>
+		var objectivesNum : List<Integer> = new LinkedList<Integer>
+		var size : Integer = ThreadLocalRandom.current().nextInt(1, 6 + 1); // Amount of objectives
+		var i : Integer = 0;
+		
+		while(i<size)
+		{
+			var obj : Integer = ThreadLocalRandom.current().nextInt(1, 6 + 1); //Objective to go to.
+			if (!objectivesNum.contains(obj))
+			{
+				objectivesNum.add(obj);
+				i++;
+				
+				/* switch seems weird in SARL so Ill just be using if/else
+				switch obj 
+				{
+					case 1: objectives.add(new Point2D(325, 125)),
+					case 2: objectives.add(new Point2D(825, 125)),
+					case 3: objectives.add(new Point2D(325, 375)),
+					case 4: objectives.add(new Point2D(825, 375)),
+					case 5: objectives.add(new Point2D(325, 625)),
+					case 6: objectives.add(new Point2D(825, 625))
+				}
+				*/
+				if(obj==1)
+				{
+					objectives.add(new Point2D(325, 125));
+				} else if (obj == 2) {
+					objectives.add(new Point2D(825, 125));
+				} else if (obj == 3) {
+					objectives.add(new Point2D(325, 375));
+				} else if (obj == 4) {
+					objectives.add(new Point2D(825, 375));
+				} else if (obj == 5) {
+					objectives.add(new Point2D(325, 625));
+				} else if (obj == 6) {
+					objectives.add(new Point2D(825, 625));
+				}
+			}
+		}
+
+		val randomExit = occurrence.parameters.get(0) as Boolean;
+		
+		if(randomExit)
+		{
+			if(Math.random() < 0.5) //Top exit
+			{
+				objectives.add(new Point2D(400, 25));
+				objectivesNum.add(0);
+			}
+			else //Bottom exit
+			{
+				objectives.add(new Point2D(750, 725));
+				objectivesNum.add(7);
+			}
+		}
+		else
+		{
+			var lastObj = objectivesNum.get(objectives.size() - 1)
+			if(lastObj == 1 || lastObj == 2 || lastObj == 3) //Top exit
+			{
+				objectives.add(new Point2D(400, 25));
+				objectivesNum.add(0);
+			}
+			else //Bottom exit
+			{
+				objectives.add(new Point2D(750, 725));
+				objectivesNum.add(7);
+			}
+		}
+
+		emit(new CustomerInitializedEvent(this.getID(), circle, objectives));
+		
+		//info("The agent "+this.getID()+" was started with the objectives "+objectivesNum)
+		//info("Those objectives are located at "+objectives)
+	}
+
+	on CustomerUpdateRequest
+	{
+		val env : Environment = occurrence.environment;
+
+		//val forceConstantToward : double = 10; //Constant used to calculate attractive forces
+		//val forceConstantAway : double = 10; // Constant used to calculate repulsive forces
+		val maxSpeed : double = 2; //Dont accelerate any more above this distance
+		val minDist : double = 10; // Consider objective reached below this distance
+		val visionDist : double = 20; // Ignore obstacles that are farther than that
+		
+		var oldAgent : AgentRepresentation = env.getAgent(this.getID());
+		var newAgent : AgentRepresentation = new AgentRepresentation(oldAgent);
+		
+		//Attractive force
+		var distX : double = 0;
+		var distY : double = 0;
+
+		// Repulsive force
+		var nDistX : double = 0;
+		var nDistY : double = 0;
+
+		// A tiny bit of randomness to prevent perfectly opposed agents from running into each other
+		var rDistX : double = 0;
+		var rDistY : double = 0;
+		
+		
+		//To traverse obstacle list since I cant foreach insarl
+		var i : int = 0; 
+		
+		if(oldAgent.getObjectives().isEmpty()) //Means an agent bugged and disappeared for no reason. Ill just kill it for now
+		{
+			emit(new CustomerExitEvent(this.getID()));
+			info("Bugged agent was deleted");
+			killMe;
+		}
+		else
+		{
+			// Get speed toward the objective no matter the distance
+			distX += oldAgent.getObjectives().get(0).getX() - oldAgent.getCircle().getCenterX();
+			distY += oldAgent.getObjectives().get(0).getY() - oldAgent.getCircle().getCenterY();
+			
+			var ratio : double = Math.pow((Math.pow(distX,2)+Math.pow(distY,2)),0.5)/maxSpeed;
+
+			if(ratio>1)
+			{
+				distX /= ratio;
+				distY /= ratio;
+			}
+		
+			// Get speed away from the obstacles close enough
+			var obsList : List<Point2D> = env.buildObstacleList(oldAgent, visionDist);
+
+			for(i=0;i<obsList.size();i++)
+			{
+				nDistX += obsList.get(i).getX() - oldAgent.getCircle().getCenterX();
+				nDistY += obsList.get(i).getY() - oldAgent.getCircle().getCenterY();
+			}
+			
+			ratio = Math.pow((Math.pow(nDistX, 2) + Math.pow(nDistY, 2)), 0.5) / maxSpeed;
+
+			if (ratio > 1) {
+				nDistX /= ratio;
+				nDistY /= ratio;
+			}
+			
+			// Get random speed
+			rDistX = (Math.random() - 0.5) / 100;
+			rDistY = (Math.random() - 0.5) / 100;
+			
+			
+			// calculate the new position
+			newAgent.getCircle().setCenterX(oldAgent.getCircle().getCenterX() + distX - nDistX + rDistX);
+			newAgent.getCircle().setCenterY(oldAgent.getCircle().getCenterY() + distY - nDistY + rDistY);
+		
+		
+		
+			// If close enough to objective, stop movement and move on to next objective
+			if (Math.pow((Math.pow(newAgent.getCircle().getCenterX() - newAgent.getObjectives.get(0).getX(), 2) +
+						  Math.pow(newAgent.getCircle().getCenterY() - newAgent.getObjectives.get(0).getY(), 2)), 0.5) <minDist) 
+			{
+				distX = 0;
+				distY = 0;
+				newAgent.getObjectives.remove(0);
+			}
+
+			if (newAgent.getObjectives.isEmpty()) {
+				emit(new CustomerExitEvent(this.getID()))
+				killMe;
+			} else {
+				emit(new CustomerUpdatedEvent(this.getID(), newAgent.getCircle(), newAgent.getObjectives()));
+			}
+		}
+	}
+
+	on ExitApplicationEvent {
+		killMe;
+	}
+
+	on Destroy {
+		// Event trigger when the agent is destroyed from the system.
+		// You should put all the resource releasing statements in this block of code.
+		emit(new CustomerExitEvent(this.getID()));
+		info("The agent was stopped.")
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	on AgentSpawned {
+		// A new agent has been spawned in our context.
+	}
+
+	on AgentKilled {
+		// A new agent has been killed in our context.
+	}
+
+	on ContextJoined {
+		// Event trigger when an agent of the level joins a shared context.
+		// Sent to a agent of the same level.
+	}
+
+	on ContextLeft {
+		// Event trigger when an agent of the level jleaves a shared context.
+		// Sent to a agent of the same level.
+	}
+
+	on MemberJoined {
+		// Event trigger when an agent joins one of our shared super-holons.
+		// Sent to all members of the considered super-holon.
+	}
+
+	on MemberLeft {
+		// Event trigger when an agent leaves one of our shared super-holons.
+		// Sent to all members of the considered super-holon.
+	}
+
+	on MemberLeft {
+		// Event trigger when an agent leaves one of our shared super-holons.
+		// Sent to all members of the considered super-holon.
+	}
+
+	on SpaceCreated {
+		// Event trigger when a space is created into one of the contexts where the agent is.
+	}
+
+	on SpaceDestroyed {
+		// Event trigger when a space is destroyed from one of the contexts where the agent is.
+	}
+
+	on ParticipantJoined {
+		// Event trigger when a participant has joined a space.
+	}
+
+	on ParticipantLeft {
+		// Event trigger when a participant has left a space.
+	}
+}

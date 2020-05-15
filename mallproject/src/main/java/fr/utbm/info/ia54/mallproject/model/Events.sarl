@@ -1,0 +1,53 @@
+package fr.utbm.info.ia54.mallproject.model
+
+import java.util.UUID
+import javafx.scene.shape.Circle
+import java.util.List
+import javafx.geometry.Point2D
+
+event ExitApplicationEvent {}
+
+event CustomerInitializedEvent //Customer tells the Main that it has spawned
+{
+	val customerID : UUID
+	val circle : Circle
+	val objectives : List<Point2D>
+
+	new(customerID : UUID, circle : Circle, objectives : List<Point2D>) {
+		this.customerID = customerID;
+		this.circle = circle;
+		this.objectives = objectives;
+	}
+}
+
+event CustomerUpdateRequest // Main asks the customers to calculate their next position
+{
+	val environment : Environment
+	
+	new(environment : Environment)
+	{
+		this.environment=environment;
+	}
+} 
+
+event CustomerUpdatedEvent //Customer returns their next position to the Main
+{
+	val customerID : UUID
+	val circle : Circle
+	val objectives : List<Point2D>
+
+	new(customerID : UUID, circle : Circle, objectives : List<Point2D>) {
+		this.customerID = customerID;
+		this.circle = circle;
+		this.objectives = objectives;
+	}
+}
+
+event CustomerExitEvent
+{
+	val customerID : UUID
+
+	new(customerID : UUID) {
+		this.customerID = customerID;
+	}
+}

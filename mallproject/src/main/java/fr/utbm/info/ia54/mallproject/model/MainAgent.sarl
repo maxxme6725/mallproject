@@ -1,0 +1,227 @@
+package fr.utbm.info.ia54.mallproject.model;
+
+import fr.utbm.info.ia54.mallproject.view.Display
+import io.sarl.core.AgentKilled
+import io.sarl.core.AgentSpawned
+import io.sarl.core.ContextJoined
+import io.sarl.core.ContextLeft
+import io.sarl.core.Destroy
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import io.sarl.core.MemberJoined
+import io.sarl.core.MemberLeft
+import io.sarl.core.ParticipantJoined
+import io.sarl.core.ParticipantLeft
+import io.sarl.core.SpaceCreated
+import io.sarl.core.SpaceDestroyed
+import io.sarl.core.DefaultContextInteractions
+import io.sarl.core.Schedules
+import io.sarl.core.Lifecycle
+import java.util.UUID
+import java.util.List
+import javafx.scene.shape.Circle
+import javafx.geometry.Point2D
+
+event MainReady{}
+
+agent MainAgent {
+	
+	uses Lifecycle
+
+	var env : Environment; //Stores the position of the objects in the simulation
+	var disp : Display; //Handles the view
+	var met : Metrics; //Stores information on the simulation
+
+	// launching options
+	var pillars : Boolean
+	var benches : Boolean
+	var randomExit : Boolean
+	var agentsDelay : double  //Delay between each agent spawn
+
+	uses Logging, DefaultContextInteractions, Schedules
+
+	on Initialize {
+		// Event trigger before the agent begin to live or to be used.
+		// You should put all the initialization statements in this block of code.
+		info("Main agent spawned !");
+
+	
+
+		synchronized (this) //Im not sure what synchronized do but it removes the warnings
+		{
+			pillars = occurrence.parameters.get(0) as Boolean;
+			benches = occurrence.parameters.get(1) as Boolean;
+			randomExit = occurrence.parameters.get(2) as Boolean;
+			agentsDelay = occurrence.parameters.get(3) as Double;
+			var agentsSimultaneous = occurrence.parameters.get(4) as Integer;
+			var agentsTotal = occurrence.parameters.get(5) as Integer;
+
+			env = new Environment(pillars, benches);
+			met = new Metrics(agentsSimultaneous, agentsTotal);
+
+			info("Environment initialized.");
+
+			disp = new Display(env, met);
+
+			// Find a way to transfer the stage from StartWindow to here
+			info("Display initialized.");
+
+			disp.changeDisplayFrameTitle("Simulation");
+			disp.changeDisplayFrameSize(1280, 960);
+
+			info("Displaying...");
+
+			emit(new MainReady());
+		}
+	}
+	
+	on MainReady
+	{
+		info("Starting to loop...")
+		
+		
+		synchronized (this)
+		{
+			var framerate : int = 20;
+			val taskMain = task("Main Loop")
+			taskMain.every(1000 / framerate) [
+
+				// info("New frame.");
+				disp.displaySimulationFrame();
+				// Add more stuff to the loop
+				emit(new CustomerUpdateRequest(env))
+			]
+
+			val taskSpawn = task("Agent Spawning Loop")
+			val rate : long = Math.round(agentsDelay.doubleValue() * 1000);
+			
+			taskSpawn.every(rate) [
+
+				if (met.getActiveAgents() < met.getSimultaneousAgents() && met.getSpawnedAgents() < met.getTotalAgents()) {
+
+					met.setActiveAgents(met.getActiveAgents() + 1);
+					met.setSpawnedAgents(met.getSpawnedAgents()+1);
+					
+					info("Spawning new agent.");
+					
+					spawn(CustomerAgent, randomExit);
+				}
+			]
+		}
+		
+		
+		
+		
+	}
+	
+	on CustomerInitializedEvent
+	{
+		var id : UUID = occurrence.customerID;
+		var circle : Circle = occurrence.circle; //idk what this warning means but it works
+		var objectives : List<Point2D> = occurrence.objectives;
+		
+		synchronized(this)
+		{
+			env.agents.add(new AgentRepresentation(id, circle, objectives));
+		}
+	}
+	
+	on CustomerUpdatedEvent
+	{
+		var id : UUID = occurrence.customerID;
+		var circle : Circle = occurrence.circle;
+		var objectives : List<Point2D> = occurrence.objectives;
+		
+		synchronized(this)
+		{
+			if(!env.updateAgent(id, circle, objectives))
+			{
+				info("new position of agent "+id+" (color "+circle.getFill()+") invalid.");
+			}
+		}
+	}
+	
+	on CustomerExitEvent
+	{
+		var id : UUID = occurrence.customerID;
+
+		synchronized (this) 
+		{
+			env.removeAgent(id)
+			met.setActiveAgents(env.getAgents().size());
+		}
+	}
+	
+	on ExitApplicationEvent
+	{
+		killMe;
+	}
+
+	on Destroy {
+		// Event trigger when the agent is destroyed from the system.
+		// You should put all the resource releasing statements in this block of code.
+		info("The main agent has stopped.")
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	on AgentSpawned {
+		// A new agent has been spawned in our context.
+	}
+
+	on AgentKilled {
+		// A new agent has been killed in our context.
+	}
+
+	on ContextJoined {
+		// Event trigger when an agent of the level joins a shared context.
+		// Sent to a agent of the same level.
+	}
+
+	on ContextLeft {
+		// Event trigger when an agent of the level jleaves a shared context.
+		// Sent to a agent of the same level.
+	}
+
+	on MemberJoined {
+		// Event trigger when an agent joins one of our shared super-holons.
+		// Sent to all members of the considered super-holon.
+	}
+
+	on MemberLeft {
+		// Event trigger when an agent leaves one of our shared super-holons.
+		// Sent to all members of the considered super-holon.
+	}
+
+	on MemberLeft {
+		// Event trigger when an agent leaves one of our shared super-holons.
+		// Sent to all members of the considered super-holon.
+	}
+
+	on SpaceCreated {
+		// Event trigger when a space is created into one of the contexts where the agent is.
+	}
+
+	on SpaceDestroyed {
+		// Event trigger when a space is destroyed from one of the contexts where the agent is.
+	}
+
+	on ParticipantJoined {
+		// Event trigger when a participant has joined a space.
+	}
+
+	on ParticipantLeft {
+		// Event trigger when a participant has left a space.
+	}
+}
