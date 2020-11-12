@@ -1,6 +1,6 @@
 package fr.utbm.info.ia54.mallproject.model;
 
-import java.util.LinkedList;
+import java.util.LinkedList; 
 import java.util.List;
 import java.util.UUID;
 
@@ -62,6 +62,11 @@ public class AgentRepresentation {
 	}
 	
 	
-
+	public double getX() {
+		return circle.getCenterX();
+	}
+	public double getY() {
+		return circle.getCenterY();
+	}
 
 }

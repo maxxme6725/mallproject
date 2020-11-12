@@ -80,12 +80,14 @@ public class StartWindow extends Application{
         });
 		
 		pillarsCheckBox = new CheckBox("Pillars");
+		pillarsCheckBox.setSelected(true);
 		benchesCheckBox = new CheckBox("Benches");
+		benchesCheckBox.setSelected(true);
 		exitCheckBox = new CheckBox("Random exit");
 		agentsDelaySlider = new Slider();
 		agentsDelaySlider.setMin(0.1);
 		agentsDelaySlider.setMax(5);
-		agentsDelaySlider.setValue(1); 
+		agentsDelaySlider.setValue(2); 
 		agentsDelaySlider.setBlockIncrement(0.1);
 		
 		agentsDelayLabel = new Label("Agent spawn delay : " + agentsDelaySlider.getValue() + " seconds");
@@ -109,7 +111,7 @@ public class StartWindow extends Application{
 		
 		agentsSimultaneousSlider = new Slider();
 		agentsSimultaneousSlider.setMin(1);
-		agentsSimultaneousSlider.setMax(100);
+		agentsSimultaneousSlider.setMax(5000);
 		agentsSimultaneousSlider.setValue(50); 
 		
 		agentsSimultaneousLabel = new Label("Amount of simulateneous agents : " + (int)agentsSimultaneousSlider.getValue());

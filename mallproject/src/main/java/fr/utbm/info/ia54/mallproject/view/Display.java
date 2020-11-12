@@ -1,6 +1,6 @@
 package fr.utbm.info.ia54.mallproject.view;
 
-import fr.utbm.info.ia54.mallproject.StartWindow;
+import fr.utbm.info.ia54.mallproject.StartWindow; 
 import fr.utbm.info.ia54.mallproject.model.AgentRepresentation;
 import fr.utbm.info.ia54.mallproject.model.Environment;
 import fr.utbm.info.ia54.mallproject.model.Metrics;
@@ -49,7 +49,12 @@ public class Display{
     	
     	g.getChildren().addAll(environment.getExits());
     	
-    	//Beacons are invisible
+    	//Beacons are invisible if debug is off
+    	boolean debug=false;
+    	if(debug)
+    	{
+        	g.getChildren().addAll(environment.getBeacons());
+    	}
         
     	g.getChildren().addAll(environment.getPillars());
     	
